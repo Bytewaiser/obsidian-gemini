@@ -2,16 +2,61 @@ import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Set
 
 // Remember to rename these classes and interfaces!
 
-interface MyPluginSettings {
-	mySetting: string;
+interface Config {
+	apiKey: string;
 }
 
-const DEFAULT_SETTINGS: MyPluginSettings = {
-	mySetting: 'default'
+const DEFAULT_SETTINGS: Config = {
+	apiKey: ''
+}
+
+
+// jsonPayload=$(cat <<EOF
+// {
+//   "contents": [{
+//     "parts": [{
+//       "text": "$*"
+//     }],
+//   }]
+// }
+// EOF
+// )
+//
+//
+// curl -sS \
+//   -H 'Content-Type: application/json' \
+//   -d "$jsonPayload" \
+//   -X POST "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=AIzaSyDbKNOhQeOU4cV2zBm8Tx1ptFX80AV1u9c" | jq -r '.candidates[0].content.parts[0].text' | glow
+
+
+async function generateContent(text: string, apiKey: string): Promise<string> {
+
+	const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent";
+
+	const jsonPayload = JSON.stringify({
+		"contents": [{
+			"parts": [{
+				"text": text
+			}],
+		}]
+	});
+
+	const headers = {
+		"Content-Type": "application/json",
+	}
+
+	const response = await fetch(`${url}?key=${apiKey}`, {
+		method: "POST",
+		headers: headers,
+		body: jsonPayload
+	});
+
+	return response.text();
+
 }
 
 export default class MyPlugin extends Plugin {
-	settings: MyPluginSettings;
+	settings: Config;
 
 	async onload() {
 		await this.loadSettings();
@@ -38,11 +83,17 @@ export default class MyPlugin extends Plugin {
 		});
 		// This adds an editor command that can perform some operation on the current editor instance
 		this.addCommand({
-			id: 'sample-editor-command',
-			name: 'Sample editor command',
-			editorCallback: (editor: Editor, view: MarkdownView) => {
-				console.log(editor.getSelection());
-				editor.replaceSelection('Sample Editor Command');
+			id: 'generate-command',
+			name: 'Generate content from selected',
+			editorCallback: async (editor: Editor, view: MarkdownView) => {
+
+				let line = editor.getCursor().line;
+				let selected_text = editor.getSelection() ? editor.getSelection() : editor.getLine(line);
+				console.log(selected_text);
+				// let content = await generateContent(selected_text, this.settings.apiKey);
+				// let content_parsed = JSON.parse(content).candidates[0].content.parts[0].text;
+				let content_parsed = "asd"
+				editor.setLine(line, `${selected_text}\n${content_parsed}`);
 			}
 		});
 		// This adds a complex command that can check whether the current state of the app allows execution of the command
@@ -121,13 +172,13 @@ class SampleSettingTab extends PluginSettingTab {
 		containerEl.empty();
 
 		new Setting(containerEl)
-			.setName('Setting #1')
-			.setDesc('It\'s a secret')
+			.setName('BardApi Key')
+			.setDesc('Enter Google AI Studio api key')
 			.addText(text => text
-				.setPlaceholder('Enter your secret')
-				.setValue(this.plugin.settings.mySetting)
+				.setPlaceholder('Enter your api key')
+				.setValue(this.plugin.settings.apiKey)
 				.onChange(async (value) => {
-					this.plugin.settings.mySetting = value;
+					this.plugin.settings.apiKey = value;
 					await this.plugin.saveSettings();
 				}));
 	}
